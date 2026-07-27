@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
 import './App.css'
+import { baixarFichaPdf } from './gerarFichaPdf'
 
 const moradores = [1, 2, 3]
 const animais = [1, 2, 3]
@@ -10,9 +11,16 @@ function App() {
 
   function enviarFicha(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    setMensagem(
-      'Ficha preenchida. A geração do documento será implementada em uma próxima etapa.',
+    const formulario = new FormData(event.currentTarget)
+    const dados = Object.fromEntries(
+      Array.from(formulario.entries(), ([chave, conteudo]) => [
+        chave,
+        String(conteudo),
+      ]),
     )
+
+    baixarFichaPdf(dados)
+    setMensagem('PDF gerado e baixado com sucesso.')
   }
 
   return (

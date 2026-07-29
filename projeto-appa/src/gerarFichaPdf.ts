@@ -223,14 +223,13 @@ export function criarFichaPdf(dados: DadosFicha) {
   y += 3
 
   const colunas = [
-    { titulo: 'NOME DO ANIMAL', largura: 32 },
-    { titulo: 'ESPÉCIE', largura: 22 },
-    { titulo: 'DE RUA', largura: 15 },
-    { titulo: 'RAÇA', largura: 31 },
+    { titulo: 'NOME DO ANIMAL', largura: 36 },
+    { titulo: 'ESPÉCIE', largura: 24 },
+    { titulo: 'RAÇA', largura: 35 },
     { titulo: 'IDADE', largura: 18 },
-    { titulo: 'VACINAS', largura: 21 },
-    { titulo: 'PESO', largura: 17 },
-    { titulo: 'ÚLTIMO CIO', largura: 34 },
+    { titulo: 'VACINAS', largura: 23 },
+    { titulo: 'PESO', largura: 18 },
+    { titulo: 'ÚLTIMO CIO', largura: 36 },
   ]
   const alturaCabecalho = 11
   const alturaLinha = 10
@@ -247,24 +246,9 @@ export function criarFichaPdf(dados: DadosFicha) {
   y += alturaCabecalho
 
   for (let numero = 1; numero <= 3; numero += 1) {
-    const animalPreenchido = [
-      `animal${numero}Nome`,
-      `animal${numero}Especie`,
-      `animal${numero}Raca`,
-      `animal${numero}Idade`,
-      `animal${numero}Vacinas`,
-      `animal${numero}Peso`,
-      `animal${numero}UltimoCio`,
-      `animal${numero}DeRua`,
-    ].some((campo) => Boolean(valor(dados, campo)))
     const celulas = [
       valor(dados, `animal${numero}Nome`),
       valor(dados, `animal${numero}Especie`),
-      animalPreenchido
-        ? valor(dados, `animal${numero}DeRua`)
-          ? 'SIM'
-          : 'NÃO'
-        : '',
       valor(dados, `animal${numero}Raca`),
       valor(dados, `animal${numero}Idade`),
       valor(dados, `animal${numero}Vacinas`),
@@ -317,12 +301,10 @@ export function criarFichaPdf(dados: DadosFicha) {
   }
 
   const nome = valor(dados, 'nome') || '________________________________'
-  const aceitou = valor(dados, 'aceiteDeclaracao')
   const declaracao =
     `Eu, ${nome}, declaro para os devidos fins que as informações acima prestadas ` +
     'são verdadeiras e estou ciente de que poderei ser fiscalizado(a) pela APPA e pela Prefeitura de Papanduva - SC. ' +
-    'Caso os dados não sejam verdadeiros, o fato poderá constituir crime de falsidade ideológica, conforme art. 299 do Código Penal. ' +
-    `[${aceitou ? 'X' : ' '}] Ciente.`
+    'Caso os dados não sejam verdadeiros, o fato poderá constituir crime de falsidade ideológica, conforme art. 299 do Código Penal.'
   const linhasDeclaracao = doc.splitTextToSize(declaracao, LARGURA)
   doc.text(linhasDeclaracao, MARGEM, y)
   y += linhasDeclaracao.length * 2.8 + 3

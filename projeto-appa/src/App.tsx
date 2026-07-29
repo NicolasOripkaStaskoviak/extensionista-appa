@@ -8,6 +8,7 @@ const animais = [1, 2, 3]
 
 function App() {
   const [mensagem, setMensagem] = useState('')
+  const [animalDeRua, setAnimalDeRua] = useState(false)
 
   function enviarFicha(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -24,115 +25,180 @@ function App() {
   }
 
   return (
-    <main className="pagina">
-      <section className="formulario-container" aria-labelledby="titulo-pagina">
+    <div className="app-shell">
+      <aside className="sidebar">
+        <div className="marca">
+          <strong>APPA</strong>
+          <span>Gestão interna</span>
+        </div>
+
+        <div className="perfil">
+          <div className="avatar" aria-hidden="true">
+            VO
+          </div>
+          <div>
+            <strong>Voluntário(a)</strong>
+            <span>Equipe da ONG</span>
+          </div>
+        </div>
+
+        <nav className="menu" aria-label="Menu principal">
+          <p>Cadastros</p>
+          <a className="item-menu ativo" href="#nova-ficha" aria-current="page">
+            <span>Nova ficha</span>
+            <small>Atual</small>
+          </a>
+          <div className="item-menu item-futuro">
+            <span>Planilha completa</span>
+            <small>Em breve</small>
+          </div>
+          <div className="item-menu item-futuro">
+            <span>Todos os animais</span>
+            <small>Em breve</small>
+          </div>
+          <div className="item-menu item-futuro">
+            <span>Agendamentos</span>
+            <small>Em breve</small>
+          </div>
+        </nav>
+      </aside>
+
+      <main className="pagina" id="nova-ficha">
+        <section className="formulario-container" aria-labelledby="titulo-pagina">
         <header>
           <h1 id="titulo-pagina">Ficha cadastral — Projeto Castração</h1>
           <p>Preencha os dados do responsável e dos animais.</p>
         </header>
 
         <form onSubmit={enviarFicha}>
-          <fieldset>
-            <legend>Dados do responsável</legend>
-
-            <div className="campo">
-              <label htmlFor="nome">Nome completo</label>
-              <input id="nome" name="nome" type="text" autoComplete="name" />
+          <div className="controle-animal-rua">
+            <div>
+              <strong>Animal de rua</strong>
+              <p>Ative quando não houver uma pessoa responsável pelo animal.</p>
             </div>
+            <label className="switch">
+              <span className="texto-switch">
+                {animalDeRua ? 'Ativado' : 'Desativado'}
+              </span>
+              <input
+                type="checkbox"
+                role="switch"
+                name="animalDeRua"
+                value="sim"
+                checked={animalDeRua}
+                onChange={(event) => {
+                  setAnimalDeRua(event.target.checked)
+                  setMensagem('')
+                }}
+              />
+              <span className="switch-trilho" aria-hidden="true" />
+            </label>
+          </div>
 
-            <div className="grade grade-3">
-              <div className="campo">
-                <label htmlFor="profissao">Profissão</label>
-                <input id="profissao" name="profissao" type="text" />
-              </div>
-              <div className="campo">
-                <label htmlFor="rg">RG</label>
-                <input id="rg" name="rg" type="text" />
-              </div>
-              <div className="campo">
-                <label htmlFor="cpf">CPF</label>
-                <input
-                  id="cpf"
-                  name="cpf"
-                  type="text"
-                  inputMode="numeric"
-                  placeholder="000.000.000-00"
-                />
-              </div>
-            </div>
+          {!animalDeRua && (
+            <fieldset>
+              <legend>Dados do responsável</legend>
 
-            <div className="campo">
-              <label htmlFor="nis">NIS / CadÚnico</label>
-              <input id="nis" name="nis" type="text" inputMode="numeric" />
-            </div>
-
-            <div className="grade grade-endereco">
               <div className="campo">
-                <label htmlFor="endereco">Endereço</label>
-                <input
-                  id="endereco"
-                  name="endereco"
-                  type="text"
-                  autoComplete="street-address"
-                />
+                <label htmlFor="nome">Nome completo</label>
+                <input id="nome" name="nome" type="text" autoComplete="name" />
               </div>
-              <div className="campo">
-                <label htmlFor="telefone">Telefone</label>
-                <input
-                  id="telefone"
-                  name="telefone"
-                  type="tel"
-                  autoComplete="tel"
-                  placeholder="(00) 00000-0000"
-                />
-              </div>
-            </div>
 
-            <div className="campo">
-              <span className="rotulo">Residência</span>
-              <div className="opcoes">
-                {['Própria', 'Alugada', 'Financiada', 'Cedida'].map((opcao) => (
-                  <label className="opcao" key={opcao}>
-                    <input
-                      type="radio"
-                      name="residencia"
-                      value={opcao.toLowerCase()}
-                    />
-                    {opcao}
-                  </label>
-                ))}
+              <div className="grade grade-3">
+                <div className="campo">
+                  <label htmlFor="profissao">Profissão</label>
+                  <input id="profissao" name="profissao" type="text" />
+                </div>
+                <div className="campo">
+                  <label htmlFor="rg">RG</label>
+                  <input id="rg" name="rg" type="text" />
+                </div>
+                <div className="campo">
+                  <label htmlFor="cpf">CPF</label>
+                  <input
+                    id="cpf"
+                    name="cpf"
+                    type="text"
+                    inputMode="numeric"
+                    placeholder="000.000.000-00"
+                  />
+                </div>
               </div>
-            </div>
 
-            <div className="grade grade-veiculo">
               <div className="campo">
-                <span className="rotulo">Possui veículo?</span>
+                <label htmlFor="nis">NIS / CadÚnico</label>
+                <input id="nis" name="nis" type="text" inputMode="numeric" />
+              </div>
+
+              <div className="grade grade-endereco">
+                <div className="campo">
+                  <label htmlFor="endereco">Endereço</label>
+                  <input
+                    id="endereco"
+                    name="endereco"
+                    type="text"
+                    autoComplete="street-address"
+                  />
+                </div>
+                <div className="campo">
+                  <label htmlFor="telefone">Telefone</label>
+                  <input
+                    id="telefone"
+                    name="telefone"
+                    type="tel"
+                    autoComplete="tel"
+                    placeholder="(00) 00000-0000"
+                  />
+                </div>
+              </div>
+
+              <div className="campo">
+                <span className="rotulo">Residência</span>
                 <div className="opcoes">
-                  <label className="opcao">
-                    <input type="radio" name="possuiVeiculo" value="sim" />
-                    Sim
-                  </label>
-                  <label className="opcao">
-                    <input type="radio" name="possuiVeiculo" value="nao" />
-                    Não
+                  {['Própria', 'Alugada', 'Financiada', 'Cedida'].map((opcao) => (
+                    <label className="opcao" key={opcao}>
+                      <input
+                        type="radio"
+                        name="residencia"
+                        value={opcao.toLowerCase()}
+                      />
+                      {opcao}
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              <div className="grade grade-veiculo">
+                <div className="campo">
+                  <span className="rotulo">Possui veículo?</span>
+                  <div className="opcoes">
+                    <label className="opcao">
+                      <input type="radio" name="possuiVeiculo" value="sim" />
+                      Sim
+                    </label>
+                    <label className="opcao">
+                      <input type="radio" name="possuiVeiculo" value="nao" />
+                      Não
+                    </label>
+                  </div>
+                </div>
+                <div className="campo">
+                  <label htmlFor="veiculo">Marca, modelo e ano</label>
+                  <input id="veiculo" name="veiculo" type="text" />
+                </div>
+                <div className="campo">
+                  <label className="opcao opcao-financiado">
+                    <input type="checkbox" name="veiculoFinanciado" />
+                    Veículo financiado
                   </label>
                 </div>
               </div>
-              <div className="campo">
-                <label htmlFor="veiculo">Marca, modelo e ano</label>
-                <input id="veiculo" name="veiculo" type="text" />
-              </div>
-              <div className="campo">
-                <label className="opcao opcao-financiado">
-                  <input type="checkbox" name="veiculoFinanciado" />
-                  Veículo financiado
-                </label>
-              </div>
-            </div>
-          </fieldset>
+            </fieldset>
+          )}
 
-          <fieldset>
-            <legend>Informações familiares</legend>
+          {!animalDeRua && (
+            <fieldset>
+              <legend>Informações familiares</legend>
 
             <div className="campo">
               <label htmlFor="renda-familiar">Renda familiar mensal</label>
@@ -203,25 +269,15 @@ function App() {
                 </div>
               </div>
             ))}
-          </fieldset>
+            </fieldset>
+          )}
 
           <fieldset>
             <legend>Animais a serem esterilizados</legend>
 
             {animais.map((numero) => (
               <section className="animal" key={numero} aria-labelledby={`animal-${numero}`}>
-                <div className="cabecalho-animal">
-                  <h2 id={`animal-${numero}`}>Animal {numero}</h2>
-                  <label className="switch">
-                    <span>Animal de rua</span>
-                    <input
-                      type="checkbox"
-                      role="switch"
-                      name={`animal${numero}DeRua`}
-                    />
-                    <span className="switch-trilho" aria-hidden="true" />
-                  </label>
-                </div>
+                <h2 id={`animal-${numero}`}>Animal {numero}</h2>
 
                 <div className="grade grade-animal">
                   <div className="campo campo-nome-animal">
@@ -295,45 +351,27 @@ function App() {
               <label htmlFor="observacoes">Observações sobre os animais</label>
               <textarea id="observacoes" name="observacoes" rows={4} />
             </div>
+
+            <div className="campo campo-data-castracao">
+              <label htmlFor="data-castracao">Data da castração</label>
+              <input id="data-castracao" name="dataCastracao" type="date" />
+            </div>
           </fieldset>
 
           <fieldset>
-            <legend>Declaração</legend>
-
-            <div className="aviso">
-              <p>
-                Animais com hérnia umbilical, testículos internos ou piometra
-                poderão ter acréscimo no valor da castração.
-              </p>
-              <p>
-                Não serão realizados exames pré-operatórios. Doenças
-                preexistentes devem ser informadas pelo responsável.
-              </p>
-              <p>
-                Animais braquicefálicos e outras raças com essa característica
-                poderão ter acréscimo devido ao risco anestésico.
-              </p>
-              <p>
-                O responsável deverá seguir os cuidados pós-operatórios
-                orientados pela equipe.
-              </p>
-            </div>
-
-            <label className="aceite">
-              <input type="checkbox" name="aceiteDeclaracao" />
-              Declaro que as informações prestadas são verdadeiras e estou
-              ciente das condições acima.
-            </label>
-
-            <div className="grade">
-              <div className="campo">
-                <label htmlFor="data-declaracao">Data da declaração</label>
-                <input id="data-declaracao" name="dataDeclaracao" type="date" />
-              </div>
-              <div className="campo">
-                <label htmlFor="data-castracao">Data da castração</label>
-                <input id="data-castracao" name="dataCastracao" type="date" />
-              </div>
+            <legend>Imagens dos animais</legend>
+            <div className="campo">
+              <label htmlFor="imagens-animais">Selecionar imagens</label>
+              <input
+                id="imagens-animais"
+                name="imagensAnimais"
+                type="file"
+                accept="image/*"
+                multiple
+              />
+              <small>
+                Campo opcional. As imagens não serão incluídas no PDF.
+              </small>
             </div>
           </fieldset>
 
@@ -341,7 +379,10 @@ function App() {
             <button
               type="reset"
               className="botao-secundario"
-              onClick={() => setMensagem('')}
+              onClick={() => {
+                setMensagem('')
+                setAnimalDeRua(false)
+              }}
             >
               Limpar
             </button>
@@ -354,8 +395,9 @@ function App() {
             </p>
           )}
         </form>
-      </section>
-    </main>
+        </section>
+      </main>
+    </div>
   )
 }
 

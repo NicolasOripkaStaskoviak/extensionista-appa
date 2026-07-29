@@ -28,8 +28,13 @@ function App() {
     <div className="app-shell">
       <aside className="sidebar">
         <div className="marca">
-          <strong>APPA</strong>
-          <span>Gestão interna</span>
+          <div className="marca-simbolo" aria-hidden="true">
+            <img src="/logo-appa.png" alt="" />
+          </div>
+          <div>
+            <strong>APPA</strong>
+            <span>Gestão interna</span>
+          </div>
         </div>
 
         <div className="perfil">
@@ -38,39 +43,63 @@ function App() {
           </div>
           <div>
             <strong>Voluntário(a)</strong>
-            <span>Equipe da ONG</span>
+            <span>
+              <i aria-hidden="true" />
+              Equipe da ONG
+            </span>
           </div>
         </div>
 
         <nav className="menu" aria-label="Menu principal">
           <p>Cadastros</p>
           <a className="item-menu ativo" href="#nova-ficha" aria-current="page">
-            <span>Nova ficha</span>
+            <span>
+              <b className="menu-icone" aria-hidden="true">N</b>
+              Nova ficha
+            </span>
             <small>Atual</small>
           </a>
           <div className="item-menu item-futuro">
-            <span>Planilha completa</span>
+            <span>
+              <b className="menu-icone" aria-hidden="true">P</b>
+              Planilha completa
+            </span>
             <small>Em breve</small>
           </div>
           <div className="item-menu item-futuro">
-            <span>Todos os animais</span>
+            <span>
+              <b className="menu-icone" aria-hidden="true">A</b>
+              Todos os animais
+            </span>
             <small>Em breve</small>
           </div>
           <div className="item-menu item-futuro">
-            <span>Agendamentos</span>
+            <span>
+              <b className="menu-icone" aria-hidden="true">C</b>
+              Agendamentos
+            </span>
             <small>Em breve</small>
           </div>
         </nav>
+
+        <div className="sidebar-rodape">
+          <span aria-hidden="true" />
+          Ambiente interno
+        </div>
       </aside>
 
       <main className="pagina" id="nova-ficha">
         <section className="formulario-container" aria-labelledby="titulo-pagina">
-        <header>
-          <h1 id="titulo-pagina">Ficha cadastral — Projeto Castração</h1>
-          <p>Preencha os dados do responsável e dos animais.</p>
+        <header className="cabecalho-pagina">
+          <div>
+            <span className="sobretitulo">Projeto Castração</span>
+            <h1 id="titulo-pagina">Nova ficha cadastral</h1>
+            <p>Registre os dados do responsável e dos animais para gerar o documento.</p>
+          </div>
+          <span className="uso-interno">Uso interno</span>
         </header>
 
-        <form onSubmit={enviarFicha}>
+        <form className="formulario" onSubmit={enviarFicha}>
           <div className="controle-animal-rua">
             <div>
               <strong>Animal de rua</strong>

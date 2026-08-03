@@ -1,14 +1,26 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
+import { onAuthStateChanged, signOut } from 'firebase/auth'
+import type { User } from 'firebase/auth'
 import './App.css'
 import { baixarFichaPdf } from './gerarFichaPdf'
+import { auth, persistenciaConfigurada } from './firebase'
+import Login from './Login'
 
 const moradores = [1, 2, 3]
 const animais = [1, 2, 3]
 
-function App() {
+function Painel({ usuario }: { usuario: User }) {
   const [mensagem, setMensagem] = useState('')
   const [animalDeRua, setAnimalDeRua] = useState(false)
+  const emailUsuario = usuario.email ?? 'Conta de voluntário'
+  const iniciaisUsuario = (usuario.displayName ?? emailUsuario)
+    .split(/[\s._-]+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((parte) => parte[0])
+    .join('')
+    .toUpperCase() || 'VO'
 
   function enviarFicha(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -39,13 +51,13 @@ function App() {
 
         <div className="perfil">
           <div className="avatar" aria-hidden="true">
-            VO
+            {iniciaisUsuario}
           </div>
           <div>
-            <strong>Voluntário(a)</strong>
+            <strong>{usuario.displayName || 'Voluntário(a)'}</strong>
             <span>
               <i aria-hidden="true" />
-              Equipe da ONG
+              {emailUsuario}
             </span>
           </div>
         </div>
@@ -86,6 +98,13 @@ function App() {
           <span aria-hidden="true" />
           Ambiente interno
         </div>
+        <button
+          type="button"
+          className="botao-sair"
+          onClick={() => auth && signOut(auth)}
+        >
+          Sair da conta
+        </button>
       </aside>
 
       <main className="pagina" id="nova-ficha">
@@ -428,6 +447,55 @@ function App() {
       </main>
     </div>
   )
+}
+
+function App() {
+  const [usuario, setUsuario] = useState<User | null>(null)
+  const [carregando, setCarregando] = useState(true)
+
+  useEffect(() => {
+    const authAtual = auth
+
+    if (!authAtual) {
+      setCarregando(false)
+      return
+    }
+
+    let ativo = true
+    let cancelarObservacao: () => void = () => {}
+
+    persistenciaConfigurada
+      .then(() => {
+        if (!ativo) return
+
+        cancelarObservacao = onAuthStateChanged(authAtual, (usuarioAtual) => {
+          if (!ativo) return
+          setUsuario(usuarioAtual)
+          setCarregando(false)
+        })
+      })
+      .catch(() => {
+        if (ativo) setCarregando(false)
+      })
+
+    return () => {
+      ativo = false
+      cancelarObservacao()
+    }
+  }, [])
+
+  if (carregando) {
+    return (
+      <main className="carregando-auth" aria-live="polite">
+        <div>
+          <span aria-hidden="true" />
+          Verificando acesso…
+        </div>
+      </main>
+    )
+  }
+
+  return usuario ? <Painel usuario={usuario} /> : <Login />
 }
 
 export default App

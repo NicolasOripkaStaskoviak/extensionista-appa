@@ -5,14 +5,105 @@ import type { User } from 'firebase/auth'
 import './App.css'
 import { baixarFichaPdf } from './gerarFichaPdf'
 import { auth, persistenciaConfigurada } from './firebase'
+import { salvarFicha } from './salvarFicha'
+import type { FichaPayload, ResponsavelPayload } from './salvarFicha'
+import { sincronizarUsuarioAtual } from './supabase'
 import Login from './Login'
 
 const moradores = [1, 2, 3]
 const animais = [1, 2, 3]
 
-function Painel({ usuario }: { usuario: User }) {
+function texto(formulario: FormData, campo: string) {
+  const conteudo = formulario.get(campo)
+  if (typeof conteudo !== 'string') return null
+  return conteudo.trim() || null
+}
+
+function opcaoBooleana(valor: string | null) {
+  if (valor === 'sim') return true
+  if (valor === 'nao') return false
+  return null
+}
+
+function residenciaNormalizada(valor: string | null) {
+  return valor
+    ?.normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '') ?? null
+}
+
+function criarPayload(
+  formulario: FormData,
+  usuario: User,
+  animalDeRua: boolean,
+): FichaPayload {
+  const responsavel: ResponsavelPayload = {
+    nome: texto(formulario, 'nome'),
+    profissao: texto(formulario, 'profissao'),
+    rg: texto(formulario, 'rg'),
+    cpf: texto(formulario, 'cpf'),
+    nis: texto(formulario, 'nis'),
+    endereco: texto(formulario, 'endereco'),
+    telefone: texto(formulario, 'telefone'),
+    residencia: residenciaNormalizada(texto(formulario, 'residencia')),
+    possui_veiculo: opcaoBooleana(texto(formulario, 'possuiVeiculo')),
+    veiculo_descricao: texto(formulario, 'veiculo'),
+    veiculo_financiado: formulario.has('veiculoFinanciado'),
+    renda_familiar: texto(formulario, 'rendaFamiliar'),
+    quantidade_moradores: texto(formulario, 'quantidadeMoradores'),
+    quantidade_dependentes: texto(formulario, 'quantidadeDependentes'),
+  }
+
+  const responsavelPreenchido = Object.entries(responsavel).some(
+    ([campo, valor]) =>
+      campo === 'veiculo_financiado' ? valor === true : valor !== null,
+  )
+
+  const moradoresPreenchidos = moradores
+    .map((numero) => ({
+      nome: texto(formulario, `morador${numero}Nome`),
+      idade: texto(formulario, `morador${numero}Idade`),
+      renda: texto(formulario, `morador${numero}Renda`),
+    }))
+    .filter((morador) => Object.values(morador).some((valor) => valor !== null))
+
+  const animaisPreenchidos = animais
+    .map((numero) => ({
+      nome: texto(formulario, `animal${numero}Nome`),
+      especie: texto(formulario, `animal${numero}Especie`),
+      raca: texto(formulario, `animal${numero}Raca`),
+      idade: texto(formulario, `animal${numero}Idade`),
+      vacinado: opcaoBooleana(texto(formulario, `animal${numero}Vacinas`)),
+      peso: texto(formulario, `animal${numero}Peso`),
+      ultimo_cio: texto(formulario, `animal${numero}UltimoCio`),
+    }))
+    .filter((animal) => Object.values(animal).some((valor) => valor !== null))
+
+  return {
+    usuario: {
+      email: usuario.email,
+      nome: usuario.displayName,
+    },
+    animal_de_rua: animalDeRua,
+    responsavel:
+      animalDeRua || !responsavelPreenchido ? null : responsavel,
+    moradores: animalDeRua ? [] : moradoresPreenchidos,
+    animais: animaisPreenchidos,
+    observacoes: texto(formulario, 'observacoes'),
+    data_castracao: texto(formulario, 'dataCastracao'),
+  }
+}
+
+function Painel({
+  usuario,
+  erroSincronizacao,
+}: {
+  usuario: User
+  erroSincronizacao: string
+}) {
   const [mensagem, setMensagem] = useState('')
+  const [mensagemTipo, setMensagemTipo] = useState<'sucesso' | 'erro' | 'andamento'>('sucesso')
   const [animalDeRua, setAnimalDeRua] = useState(false)
+  const [salvando, setSalvando] = useState(false)
   const emailUsuario = usuario.email ?? 'Conta de voluntário'
   const iniciaisUsuario = (usuario.displayName ?? emailUsuario)
     .split(/[\s._-]+/)
@@ -22,18 +113,47 @@ function Painel({ usuario }: { usuario: User }) {
     .join('')
     .toUpperCase() || 'VO'
 
-  function enviarFicha(event: FormEvent<HTMLFormElement>) {
+  async function enviarFicha(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     const formulario = new FormData(event.currentTarget)
     const dados = Object.fromEntries(
-      Array.from(formulario.entries(), ([chave, conteudo]) => [
-        chave,
-        String(conteudo),
-      ]),
+      Array.from(formulario.entries())
+        .filter(([, conteudo]) => typeof conteudo === 'string')
+        .map(([chave, conteudo]) => [chave, String(conteudo)]),
     )
+    const imagens = formulario
+      .getAll('imagensAnimais')
+      .filter(
+        (conteudo): conteudo is File =>
+          conteudo instanceof File && conteudo.size > 0,
+      )
 
-    baixarFichaPdf(dados)
-    setMensagem('PDF gerado e baixado com sucesso.')
+    setSalvando(true)
+    setMensagemTipo('andamento')
+    setMensagem('Salvando a ficha no banco de dados…')
+
+    try {
+      const payload = criarPayload(formulario, usuario, animalDeRua)
+      const resultado = await salvarFicha(payload, imagens, usuario)
+
+      baixarFichaPdf(dados)
+      setMensagemTipo('sucesso')
+      setMensagem(
+        resultado.falhasImagens.length
+          ? `Ficha salva e PDF gerado. Não foi possível enviar ${resultado.falhasImagens.length} imagem(ns).`
+          : 'Ficha salva no banco e PDF gerado com sucesso.',
+      )
+    } catch (erro) {
+      console.error('Erro ao processar a ficha:', erro)
+      setMensagemTipo('erro')
+      setMensagem(
+        erro instanceof Error
+          ? erro.message
+          : 'Não foi possível salvar a ficha. Tente novamente.',
+      )
+    } finally {
+      setSalvando(false)
+    }
   }
 
   return (
@@ -117,6 +237,12 @@ function Painel({ usuario }: { usuario: User }) {
           </div>
           <span className="uso-interno">Uso interno</span>
         </header>
+
+        {erroSincronizacao && (
+          <p className="mensagem mensagem-erro" role="alert">
+            {erroSincronizacao}
+          </p>
+        )}
 
         <form className="formulario" onSubmit={enviarFicha}>
           <div className="controle-animal-rua">
@@ -414,7 +540,7 @@ function Painel({ usuario }: { usuario: User }) {
                 id="imagens-animais"
                 name="imagensAnimais"
                 type="file"
-                accept="image/*"
+                accept="image/jpeg,image/png,image/webp"
                 multiple
               />
               <small>
@@ -427,6 +553,7 @@ function Painel({ usuario }: { usuario: User }) {
             <button
               type="reset"
               className="botao-secundario"
+              disabled={salvando}
               onClick={() => {
                 setMensagem('')
                 setAnimalDeRua(false)
@@ -434,11 +561,16 @@ function Painel({ usuario }: { usuario: User }) {
             >
               Limpar
             </button>
-            <button type="submit">Gerar ficha</button>
+            <button type="submit" disabled={salvando}>
+              {salvando ? 'Salvando…' : 'Salvar e gerar ficha'}
+            </button>
           </div>
 
           {mensagem && (
-            <p className="mensagem" role="status">
+            <p
+              className={`mensagem mensagem-${mensagemTipo}`}
+              role={mensagemTipo === 'erro' ? 'alert' : 'status'}
+            >
               {mensagem}
             </p>
           )}
@@ -452,6 +584,7 @@ function Painel({ usuario }: { usuario: User }) {
 function App() {
   const [usuario, setUsuario] = useState<User | null>(null)
   const [carregando, setCarregando] = useState(true)
+  const [erroSincronizacao, setErroSincronizacao] = useState('')
 
   useEffect(() => {
     const authAtual = auth
@@ -470,8 +603,29 @@ function App() {
 
         cancelarObservacao = onAuthStateChanged(authAtual, (usuarioAtual) => {
           if (!ativo) return
-          setUsuario(usuarioAtual)
-          setCarregando(false)
+
+          if (!usuarioAtual) {
+            setUsuario(null)
+            setErroSincronizacao('')
+            setCarregando(false)
+            return
+          }
+
+          setErroSincronizacao('')
+          void sincronizarUsuarioAtual(usuarioAtual)
+            .catch((erro: unknown) => {
+              console.error('Falha ao sincronizar usuário com o Supabase:', erro)
+              setErroSincronizacao(
+                erro instanceof Error
+                  ? erro.message
+                  : 'Não foi possível registrar seu usuário no banco de dados.',
+              )
+            })
+            .finally(() => {
+              if (!ativo) return
+              setUsuario(usuarioAtual)
+              setCarregando(false)
+            })
         })
       })
       .catch(() => {
@@ -495,7 +649,11 @@ function App() {
     )
   }
 
-  return usuario ? <Painel usuario={usuario} /> : <Login />
+  return usuario ? (
+    <Painel usuario={usuario} erroSincronizacao={erroSincronizacao} />
+  ) : (
+    <Login />
+  )
 }
 
 export default App

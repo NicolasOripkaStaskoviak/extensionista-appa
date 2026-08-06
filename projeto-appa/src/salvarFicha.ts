@@ -113,6 +113,24 @@ async function enviarImagem(
   }
 }
 
+export async function enviarImagensDaFicha(
+  imagens: File[],
+  usuario: User,
+  fichaId: string,
+  usuarioId: string,
+) {
+  const falhas: string[] = []
+  for (const imagem of imagens) {
+    try {
+      await enviarImagem(imagem, usuario, fichaId, usuarioId)
+    } catch (erro) {
+      console.error('Erro ao enviar imagem:', erro)
+      falhas.push(imagem.name)
+    }
+  }
+  return falhas
+}
+
 export async function salvarFicha(
   payload: FichaPayload,
   imagens: File[],
@@ -140,24 +158,17 @@ export async function salvarFicha(
     throw new ErroAoSalvarFicha('O banco retornou uma resposta inválida.')
   }
 
-  const falhasImagens: string[] = []
-
-  for (const imagem of imagens) {
-    try {
-      await enviarImagem(
-        imagem,
-        usuario,
-        resultado.ficha_id,
-        resultado.usuario_id,
-      )
-    } catch (erro) {
-      console.error('Erro ao enviar imagem:', erro)
-      falhasImagens.push(imagem.name)
-    }
-  }
+  const falhasImagens = await enviarImagensDaFicha(
+    imagens,
+    usuario,
+    resultado.ficha_id,
+    resultado.usuario_id,
+  )
 
   return {
     fichaId: resultado.ficha_id,
+    ficha_id: resultado.ficha_id,
+    usuario_id: resultado.usuario_id,
     imagensEnviadas: imagens.length - falhasImagens.length,
     falhasImagens,
   }

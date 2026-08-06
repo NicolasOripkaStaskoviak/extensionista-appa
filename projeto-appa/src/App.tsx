@@ -1,10 +1,12 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import type { User } from '@supabase/supabase-js'
 import './App.css'
-import { baixarFichaPdf } from './gerarFichaPdf'
-import { salvarFicha } from './salvarFicha'
+import { enviarImagensDaFicha, salvarFicha } from './salvarFicha'
 import type { FichaPayload, ResponsavelPayload } from './salvarFicha'
+import { atualizarFicha } from './fichasApi'
+import type { FichaCompleta } from './fichasApi'
+import FichasPage from './FichasPage'
 import { supabase } from './supabase'
 import Login, { RedefinirSenha } from './Login'
 
@@ -96,6 +98,67 @@ function criarPayload(
   }
 }
 
+function preencherCampo(
+  formulario: HTMLFormElement,
+  nome: string,
+  valor: string | number | boolean | null | undefined,
+) {
+  const controles = Array.from(formulario.elements).filter(
+    (elemento): elemento is HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement =>
+      'name' in elemento && elemento.name === nome,
+  )
+
+  controles.forEach((controle) => {
+    if (controle instanceof HTMLInputElement && controle.type === 'radio') {
+      controle.checked = String(valor) === controle.value
+    } else if (controle instanceof HTMLInputElement && controle.type === 'checkbox') {
+      controle.checked = Boolean(valor)
+    } else {
+      controle.value = valor == null ? '' : String(valor)
+    }
+  })
+}
+
+function preencherFormulario(formulario: HTMLFormElement, ficha: FichaCompleta) {
+  formulario.reset()
+  const responsavel = ficha.responsavel
+  const campos = {
+    nome: responsavel?.nome,
+    profissao: responsavel?.profissao,
+    rg: responsavel?.rg,
+    cpf: responsavel?.cpf,
+    nis: responsavel?.nis,
+    endereco: responsavel?.endereco,
+    telefone: responsavel?.telefone,
+    residencia: responsavel?.residencia,
+    possuiVeiculo: responsavel?.possui_veiculo == null ? null : responsavel.possui_veiculo ? 'sim' : 'nao',
+    veiculo: responsavel?.veiculo_descricao,
+    veiculoFinanciado: responsavel?.veiculo_financiado,
+    rendaFamiliar: responsavel?.renda_familiar,
+    quantidadeMoradores: responsavel?.quantidade_moradores,
+    quantidadeDependentes: responsavel?.quantidade_dependentes,
+  }
+  Object.entries(campos).forEach(([nome, valor]) => preencherCampo(formulario, nome, valor))
+  moradores.forEach((numero, indice) => {
+    const morador = ficha.moradores[indice]
+    preencherCampo(formulario, `morador${numero}Nome`, morador?.nome)
+    preencherCampo(formulario, `morador${numero}Idade`, morador?.idade)
+    preencherCampo(formulario, `morador${numero}Renda`, morador?.renda)
+  })
+  animais.forEach((numero, indice) => {
+    const animal = ficha.animais[indice]
+    preencherCampo(formulario, `animal${numero}Nome`, animal?.nome)
+    preencherCampo(formulario, `animal${numero}Especie`, animal?.especie)
+    preencherCampo(formulario, `animal${numero}Raca`, animal?.raca)
+    preencherCampo(formulario, `animal${numero}Idade`, animal?.idade)
+    preencherCampo(formulario, `animal${numero}Vacinas`, animal?.vacinado == null ? null : animal.vacinado ? 'sim' : 'nao')
+    preencherCampo(formulario, `animal${numero}Peso`, animal?.peso)
+    preencherCampo(formulario, `animal${numero}UltimoCio`, animal?.ultimo_cio)
+  })
+  preencherCampo(formulario, 'observacoes', ficha.observacoes)
+  preencherCampo(formulario, 'dataCastracao', ficha.data_castracao)
+}
+
 function Painel({
   usuario,
 }: {
@@ -105,6 +168,11 @@ function Painel({
   const [mensagemTipo, setMensagemTipo] = useState<'sucesso' | 'erro' | 'andamento'>('sucesso')
   const [animalDeRua, setAnimalDeRua] = useState(false)
   const [salvando, setSalvando] = useState(false)
+  const [tela, setTela] = useState<'formulario' | 'fichas'>(
+    window.location.hash === '#todas-fichas' ? 'fichas' : 'formulario',
+  )
+  const [fichaEdicao, setFichaEdicao] = useState<FichaCompleta | null>(null)
+  const formularioRef = useRef<HTMLFormElement>(null)
   const nomeUsuario = nomeDoUsuario(usuario)
   const emailUsuario = usuario.email ?? 'Conta de voluntário'
   const iniciaisUsuario = (nomeUsuario ?? emailUsuario)
@@ -115,14 +183,52 @@ function Painel({
     .join('')
     .toUpperCase() || 'VO'
 
+  function abrirNovaFicha() {
+    setFichaEdicao(null)
+    setAnimalDeRua(false)
+    setMensagem('')
+    formularioRef.current?.reset()
+    setTela('formulario')
+    window.history.pushState(null, '', '#nova-ficha')
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  function abrirTodasAsFichas() {
+    setTela('fichas')
+    window.history.pushState(null, '', '#todas-fichas')
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  function abrirEdicao(ficha: FichaCompleta) {
+    setFichaEdicao(ficha)
+    setAnimalDeRua(ficha.animal_de_rua)
+    setMensagem('')
+    setTela('formulario')
+    window.history.pushState(null, '', '#editar-ficha')
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  useEffect(() => {
+    if (tela !== 'formulario' || !fichaEdicao || !formularioRef.current) return
+    const quadro = window.requestAnimationFrame(() => {
+      if (formularioRef.current) preencherFormulario(formularioRef.current, fichaEdicao)
+    })
+    return () => window.cancelAnimationFrame(quadro)
+  }, [tela, fichaEdicao])
+
+  useEffect(() => {
+    const sincronizarTela = () => {
+      const destino = window.location.hash === '#todas-fichas' ? 'fichas' : 'formulario'
+      setTela(destino)
+      if (destino === 'fichas') setFichaEdicao(null)
+    }
+    window.addEventListener('popstate', sincronizarTela)
+    return () => window.removeEventListener('popstate', sincronizarTela)
+  }, [])
+
   async function enviarFicha(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     const formulario = new FormData(event.currentTarget)
-    const dados = Object.fromEntries(
-      Array.from(formulario.entries())
-        .filter(([, conteudo]) => typeof conteudo === 'string')
-        .map(([chave, conteudo]) => [chave, String(conteudo)]),
-    )
     const imagens = formulario
       .getAll('imagensAnimais')
       .filter(
@@ -136,15 +242,24 @@ function Painel({
 
     try {
       const payload = criarPayload(formulario, usuario, animalDeRua)
-      const resultado = await salvarFicha(payload, imagens, usuario)
-
-      baixarFichaPdf(dados)
+      const resultado = fichaEdicao
+        ? await atualizarFicha(fichaEdicao.id, payload)
+        : await salvarFicha(payload, imagens, usuario)
+      if (fichaEdicao && imagens.length) {
+        await enviarImagensDaFicha(
+          imagens,
+          usuario,
+          resultado.ficha_id,
+          resultado.usuario_id,
+        )
+      }
       setMensagemTipo('sucesso')
-      setMensagem(
-        resultado.falhasImagens.length
-          ? `Ficha salva e PDF gerado. Não foi possível enviar ${resultado.falhasImagens.length} imagem(ns).`
-          : 'Ficha salva no banco e PDF gerado com sucesso.',
-      )
+      setMensagem('Ficha salva com sucesso.')
+      formularioRef.current?.reset()
+      setFichaEdicao(null)
+      setAnimalDeRua(false)
+      setTela('fichas')
+      window.history.pushState(null, '', '#todas-fichas')
     } catch (erro) {
       console.error('Erro ao processar a ficha:', erro)
       setMensagemTipo('erro')
@@ -167,7 +282,6 @@ function Painel({
           </div>
           <div>
             <strong>APPA</strong>
-            <span>Gestão interna</span>
           </div>
         </div>
 
@@ -186,20 +300,24 @@ function Painel({
 
         <nav className="menu" aria-label="Menu principal">
           <p>Cadastros</p>
-          <a className="item-menu ativo" href="#nova-ficha" aria-current="page">
+          <button className={`item-menu ${tela === 'formulario' ? 'ativo' : ''}`} type="button" onClick={abrirNovaFicha} aria-current={tela === 'formulario' ? 'page' : undefined}>
             <span>
-              <b className="menu-icone" aria-hidden="true">N</b>
+              <b className="menu-icone" aria-hidden="true">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-plus-icon lucide-plus"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+              </b>
               Nova ficha
             </span>
-            <small>Atual</small>
-          </a>
-          <div className="item-menu item-futuro">
+            {tela === 'formulario' && <small>Atual</small>}
+          </button>
+          <button className={`item-menu ${tela === 'fichas' ? 'ativo' : ''}`} type="button" onClick={abrirTodasAsFichas} aria-current={tela === 'fichas' ? 'page' : undefined}>
             <span>
-              <b className="menu-icone" aria-hidden="true">P</b>
-              Planilha completa
+              <b className="menu-icone" aria-hidden="true">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-list-icon lucide-list"><path d="M3 5h.01"/><path d="M3 12h.01"/><path d="M3 19h.01"/><path d="M8 5h13"/><path d="M8 12h13"/><path d="M8 19h13"/></svg>
+              </b>
+              Todas as fichas
             </span>
-            <small>Em breve</small>
-          </div>
+            {tela === 'fichas' && <small>Atual</small>}
+          </button>
           <div className="item-menu item-futuro">
             <span>
               <b className="menu-icone" aria-hidden="true">A</b>
@@ -229,18 +347,21 @@ function Painel({
         </button>
       </aside>
 
-      <main className="pagina" id="nova-ficha">
+      <main className="pagina" id={tela === 'formulario' ? 'nova-ficha' : 'todas-fichas'}>
+        {tela === 'fichas' ? (
+          <FichasPage onNovaFicha={abrirNovaFicha} onEditar={abrirEdicao} />
+        ) : (
         <section className="formulario-container" aria-labelledby="titulo-pagina">
         <header className="cabecalho-pagina">
           <div>
             <span className="sobretitulo">Projeto Castração</span>
-            <h1 id="titulo-pagina">Nova ficha cadastral</h1>
-            <p>Registre os dados do responsável e dos animais para gerar o documento.</p>
+            <h1 id="titulo-pagina">{fichaEdicao ? 'Editar ficha cadastral' : 'Nova ficha cadastral'}</h1>
+            <p>{fichaEdicao ? 'Atualize os dados necessários e salve as alterações.' : 'Registre os dados do responsável e dos animais.'}</p>
           </div>
           <span className="uso-interno">Uso interno</span>
         </header>
 
-        <form className="formulario" onSubmit={enviarFicha}>
+        <form className="formulario" ref={formularioRef} onSubmit={enviarFicha}>
           <div className="controle-animal-rua">
             <div>
               <strong>Animal de rua</strong>
@@ -553,12 +674,14 @@ function Painel({
               onClick={() => {
                 setMensagem('')
                 setAnimalDeRua(false)
+                setFichaEdicao(null)
+                window.history.replaceState(null, '', '#nova-ficha')
               }}
             >
-              Limpar
+              {fichaEdicao ? 'Cancelar edição' : 'Limpar'}
             </button>
             <button type="submit" disabled={salvando}>
-              {salvando ? 'Salvando…' : 'Salvar e gerar ficha'}
+              {salvando ? 'Salvando…' : fichaEdicao ? 'Salvar alterações' : 'Salvar ficha'}
             </button>
           </div>
 
@@ -572,6 +695,7 @@ function Painel({
           )}
         </form>
         </section>
+        )}
       </main>
     </div>
   )

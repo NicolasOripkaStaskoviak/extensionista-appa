@@ -1,17 +1,20 @@
 import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
-import { onAuthStateChanged, signOut } from 'firebase/auth'
-import type { User } from 'firebase/auth'
+import type { User } from '@supabase/supabase-js'
 import './App.css'
 import { baixarFichaPdf } from './gerarFichaPdf'
-import { auth, persistenciaConfigurada } from './firebase'
 import { salvarFicha } from './salvarFicha'
 import type { FichaPayload, ResponsavelPayload } from './salvarFicha'
-import { sincronizarUsuarioAtual } from './supabase'
-import Login from './Login'
+import { supabase } from './supabase'
+import Login, { RedefinirSenha } from './Login'
 
 const moradores = [1, 2, 3]
 const animais = [1, 2, 3]
+
+function nomeDoUsuario(usuario: User) {
+  const nome = usuario.user_metadata.full_name ?? usuario.user_metadata.name
+  return typeof nome === 'string' && nome.trim() ? nome.trim() : null
+}
 
 function texto(formulario: FormData, campo: string) {
   const conteudo = formulario.get(campo)
@@ -80,8 +83,8 @@ function criarPayload(
 
   return {
     usuario: {
-      email: usuario.email,
-      nome: usuario.displayName,
+      email: usuario.email ?? null,
+      nome: nomeDoUsuario(usuario),
     },
     animal_de_rua: animalDeRua,
     responsavel:
@@ -95,17 +98,16 @@ function criarPayload(
 
 function Painel({
   usuario,
-  erroSincronizacao,
 }: {
   usuario: User
-  erroSincronizacao: string
 }) {
   const [mensagem, setMensagem] = useState('')
   const [mensagemTipo, setMensagemTipo] = useState<'sucesso' | 'erro' | 'andamento'>('sucesso')
   const [animalDeRua, setAnimalDeRua] = useState(false)
   const [salvando, setSalvando] = useState(false)
+  const nomeUsuario = nomeDoUsuario(usuario)
   const emailUsuario = usuario.email ?? 'Conta de voluntário'
-  const iniciaisUsuario = (usuario.displayName ?? emailUsuario)
+  const iniciaisUsuario = (nomeUsuario ?? emailUsuario)
     .split(/[\s._-]+/)
     .filter(Boolean)
     .slice(0, 2)
@@ -174,7 +176,7 @@ function Painel({
             {iniciaisUsuario}
           </div>
           <div>
-            <strong>{usuario.displayName || 'Voluntário(a)'}</strong>
+            <strong>{nomeUsuario || 'Voluntário(a)'}</strong>
             <span>
               <i aria-hidden="true" />
               {emailUsuario}
@@ -221,7 +223,7 @@ function Painel({
         <button
           type="button"
           className="botao-sair"
-          onClick={() => auth && signOut(auth)}
+          onClick={() => void supabase?.auth.signOut()}
         >
           Sair da conta
         </button>
@@ -237,12 +239,6 @@ function Painel({
           </div>
           <span className="uso-interno">Uso interno</span>
         </header>
-
-        {erroSincronizacao && (
-          <p className="mensagem mensagem-erro" role="alert">
-            {erroSincronizacao}
-          </p>
-        )}
 
         <form className="formulario" onSubmit={enviarFicha}>
           <div className="controle-animal-rua">
@@ -584,57 +580,37 @@ function Painel({
 function App() {
   const [usuario, setUsuario] = useState<User | null>(null)
   const [carregando, setCarregando] = useState(true)
-  const [erroSincronizacao, setErroSincronizacao] = useState('')
+  const [redefinindoSenha, setRedefinindoSenha] = useState(false)
 
   useEffect(() => {
-    const authAtual = auth
-
-    if (!authAtual) {
+    if (!supabase) {
       setCarregando(false)
       return
     }
 
     let ativo = true
-    let cancelarObservacao: () => void = () => {}
 
-    persistenciaConfigurada
-      .then(() => {
-        if (!ativo) return
+    const aplicarSessao = (usuarioAtual: User | null) => {
+      if (!ativo) return
+      setUsuario(usuarioAtual)
+      setCarregando(false)
+    }
 
-        cancelarObservacao = onAuthStateChanged(authAtual, (usuarioAtual) => {
-          if (!ativo) return
+    void supabase.auth.getSession().then(({ data }) => {
+      aplicarSessao(data.session?.user ?? null)
+    })
 
-          if (!usuarioAtual) {
-            setUsuario(null)
-            setErroSincronizacao('')
-            setCarregando(false)
-            return
-          }
-
-          setErroSincronizacao('')
-          void sincronizarUsuarioAtual(usuarioAtual)
-            .catch((erro: unknown) => {
-              console.error('Falha ao sincronizar usuário com o Supabase:', erro)
-              setErroSincronizacao(
-                erro instanceof Error
-                  ? erro.message
-                  : 'Não foi possível registrar seu usuário no banco de dados.',
-              )
-            })
-            .finally(() => {
-              if (!ativo) return
-              setUsuario(usuarioAtual)
-              setCarregando(false)
-            })
-        })
-      })
-      .catch(() => {
-        if (ativo) setCarregando(false)
-      })
+    const { data: observador } = supabase.auth.onAuthStateChange(
+      (evento, sessao) => {
+        if (evento === 'PASSWORD_RECOVERY') setRedefinindoSenha(true)
+        if (evento === 'SIGNED_OUT') setRedefinindoSenha(false)
+        aplicarSessao(sessao?.user ?? null)
+      },
+    )
 
     return () => {
       ativo = false
-      cancelarObservacao()
+      observador.subscription.unsubscribe()
     }
   }, [])
 
@@ -649,8 +625,12 @@ function App() {
     )
   }
 
+  if (redefinindoSenha) {
+    return <RedefinirSenha onConcluido={() => setRedefinindoSenha(false)} />
+  }
+
   return usuario ? (
-    <Painel usuario={usuario} erroSincronizacao={erroSincronizacao} />
+    <Painel usuario={usuario} />
   ) : (
     <Login />
   )

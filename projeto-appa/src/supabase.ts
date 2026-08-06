@@ -1,6 +1,4 @@
 import { createClient } from '@supabase/supabase-js'
-import type { User } from 'firebase/auth'
-import { auth } from './firebase'
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
   ?.trim()
@@ -22,29 +20,11 @@ export const supabaseConfigurado =
 
 export const supabase = supabaseConfigurado
   ? createClient(supabaseUrl, supabasePublishableKey, {
-      accessToken: async () => {
-        return (await auth?.currentUser?.getIdToken(false)) ?? null
-      },
       auth: {
-        autoRefreshToken: false,
-        detectSessionInUrl: false,
-        persistSession: false,
+        autoRefreshToken: true,
+        detectSessionInUrl: true,
+        persistSession: true,
+        storage: window.sessionStorage,
       },
     })
   : null
-
-export async function sincronizarUsuarioAtual(usuario: User) {
-  if (!supabase) {
-    throw new Error('O Supabase ainda não foi configurado.')
-  }
-
-  // Garante que uma claim adicionada recentemente no Firebase seja renovada
-  // antes de o token ser enviado ao Supabase.
-  await usuario.getIdToken(true)
-
-  const { error } = await supabase.rpc('registrar_usuario_atual')
-
-  if (error) {
-    throw new Error(`Não foi possível registrar o usuário: ${error.message}`)
-  }
-}

@@ -1,4 +1,4 @@
-import type { User } from 'firebase/auth'
+import type { User } from '@supabase/supabase-js'
 import { supabase, supabaseConfigurado } from './supabase'
 
 export interface MoradorPayload {
@@ -86,7 +86,7 @@ async function enviarImagem(
     throw new Error(`${arquivo.name}: arquivo maior que 10 MB`)
   }
 
-  const caminho = `${usuario.uid}/${fichaId}/${crypto.randomUUID()}-${nomeSeguro(arquivo.name)}`
+  const caminho = `${usuario.id}/${fichaId}/${crypto.randomUUID()}-${nomeSeguro(arquivo.name)}`
   const { error: erroUpload } = await supabase.storage
     .from('animais')
     .upload(caminho, arquivo, {
@@ -121,13 +121,6 @@ export async function salvarFicha(
   if (!supabase || !supabaseConfigurado) {
     throw new ErroAoSalvarFicha(
       'O Supabase ainda não foi configurado neste ambiente.',
-    )
-  }
-
-  const token = await usuario.getIdTokenResult(false)
-  if (token.claims.role !== 'authenticated') {
-    throw new ErroAoSalvarFicha(
-      'O Firebase ainda não está autorizado no Supabase. Configure a claim role como authenticated.',
     )
   }
 

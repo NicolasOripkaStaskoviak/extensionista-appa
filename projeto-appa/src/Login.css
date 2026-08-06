@@ -253,37 +253,6 @@
   content: '';
 }
 
-.login-google-container {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  min-height: 44px;
-  overflow: hidden;
-}
-
-.login-google-desabilitado {
-  pointer-events: none;
-  opacity: 0.58;
-}
-
-.login-google-configuracao {
-  margin: 0;
-  padding: 11px 13px;
-  border: 1px solid #e1c982;
-  border-radius: 9px;
-  background: #fff9e8;
-  color: #725611;
-  font-size: 12px;
-  line-height: 1.5;
-  text-align: center;
-}
-
-.login-google-configuracao code {
-  font-size: 11px;
-  font-weight: 750;
-}
-
 .login-botao:disabled,
 .login-link:disabled,
 .login-campo input:disabled {
